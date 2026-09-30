@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icon.png" width="120" alt="wb-conversation-purge"></p>
+
 # wb-conversation-purge
 
 [English](README_EN.md) | 简体中文
