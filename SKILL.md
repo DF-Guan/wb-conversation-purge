@@ -6,7 +6,7 @@ description: "彻底删除 WorkBuddy 本地对话记录与缓存。界面里的�
 description_zh: "一键彻底删除 WorkBuddy 本地对话与缓存：界面删除只是软删除，对话正文仍以明文留在硬盘。先预览清单、经确认后自动备份再删除，支持按时间/体积/软删除筛选，可一键还原，安全回收磁盘空间、抹去隐私残留。"
 description_en: "Truly purge WorkBuddy local chat history and caches from disk. The UI delete is only a soft-delete flag; plaintext .jsonl transcripts remain on disk. This skill previews a plan, backs up, then purges selected conversations or caches, with time/size filters and one-click restore."
 when_to_use: "清理对话, 删除聊天记录, 彻底删除, 释放空间, 隐私清理, 对话还在硬盘上, 清理缓存, conversation cleanup, purge chat history"
-examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉", "看看哪些对话最占空间"]
+examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉"]
 examples_en: ["Purge my WorkBuddy chat history from disk", "Free up disk space by clearing WorkBuddy caches", "Delete conversations older than 30 days for real"]
 category: productivity-tools
 version: 2.1.0
