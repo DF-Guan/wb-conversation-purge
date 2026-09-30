@@ -1,4 +1,4 @@
-# wb-conversation-cleanup
+# wb-conversation-purge
 
 [English](README_EN.md) | 简体中文
 
@@ -84,12 +84,12 @@ UPDATE sessions SET deleted_at = <时间戳> WHERE id = <会话UUID>
 
 ```bash
 # WorkBuddy
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git \
-    ~/.workbuddy/skills/wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git \
+    ~/.workbuddy/skills/wb-conversation-purge
 
 # Claude Code
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git \
-    ~/.claude/skills/wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git \
+    ~/.claude/skills/wb-conversation-purge
 ```
 
 装好后直接在对话里说：
@@ -107,8 +107,8 @@ Agent 会自动加载并按流程执行。
 ### 作为独立脚本（不用 AI 工具的人）
 
 ```bash
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git
-cd wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git
+cd wb-conversation-purge
 python scripts/cleanup.py          # 弹出菜单，按提示操作
 ```
 
@@ -155,6 +155,9 @@ python scripts/cleanup.py --all --backup --yes
 
 # 全部对话 + 缓存目录
 python scripts/cleanup.py --all --include-cache --backup --yes
+
+# 连界面会话列表一起清空（数据库会先备份）
+python scripts/cleanup.py --all --purge-db --backup --yes
 
 # 后悔了，从备份还原
 python scripts/cleanup.py --restore ~/Desktop/WB-Cleanup-Backup/files-0911-092353
@@ -261,7 +264,15 @@ python scripts/cleanup.py --restore ~/Desktop/WB-Cleanup-Backup/files-0911-09235
 python tests/test_cleanup.py
 ```
 
-8 个用例，全部用临时目录和假数据，不会碰到你的真实文件。
+9 个用例，全部用临时目录和假数据，不会碰到你的真实文件。
+
+---
+
+## 更新记录
+
+- **2.0.0（2026-09）** —— 技能更名 `wb-conversation-purge`（purge 才是这件事的本质）；修复 `--purge-db` 参数从未传入执行函数的 bug；Windows 控制台输出加 UTF-8 保护；purge-db 与缓存清理写入审计日志；SKILL.md 按 WorkBuddy 开放平台规范补齐字段，已具备上架技能市场的完整 frontmatter
+- **1.1.0** —— 缓存清理独立成模式，不再捆绑删除对话；新增备份与一键还原
+- **1.0.0** —— 首发
 
 ---
 

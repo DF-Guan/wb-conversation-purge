@@ -174,6 +174,29 @@ def test_parse_age():
     assert cleanup.parse_age("45") == 45
 
 
+def test_purge_db_flag_reaches_run():
+    """回归：--purge-db 必须真的传入 run()（v1.1 里曾被丢弃，静默失效）"""
+    argv_backup = sys.argv
+    orig_run = cleanup.run
+    calls = {}
+
+    def fake_run(mode, include_cache, want_backup, assume_yes, purge, backup_root, **kw):
+        calls["purge"] = purge
+        return 0
+
+    cleanup.run = fake_run
+    sys.argv = ["cleanup.py", "--list", "--purge-db"]
+    try:
+        try:
+            cleanup.main()
+        except SystemExit:
+            pass
+        assert calls.get("purge") is True, "--purge-db 未传入 run()"
+    finally:
+        cleanup.run = orig_run
+        sys.argv = argv_backup
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

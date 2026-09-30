@@ -9,6 +9,7 @@ WorkBuddy 本地数据彻底清理工具
   软删除项     python cleanup.py --soft-deleted --backup --yes
   按时间       python cleanup.py --older-than 30d --backup --yes
   全清         python cleanup.py --all [--include-cache] --backup --yes
+  连列表清     python cleanup.py --all --purge-db --backup --yes
   还原         python cleanup.py --restore <备份目录>
 
 原理：界面里的"删除"只是给 sessions.deleted_at 打标记（软删除），
@@ -21,6 +22,13 @@ import shutil
 import argparse
 import datetime
 import subprocess
+
+# Windows 控制台常见 GBK 编码，中文与特殊符号可能触发 UnicodeEncodeError
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 ROOT = os.path.join(os.path.expanduser("~"), ".workbuddy")
 PROJECTS = os.path.join(ROOT, "projects")
@@ -331,6 +339,7 @@ def purge_db(backup_root):
         conn.execute("vacuum")
         conn.close()
         print("  已清空界面会话列表，数据库原档备份于：%s" % dst)
+        audit("清空数据库会话列表（purge-db），数据库备份于 %s" % dst)
     except Exception as e:
         print("  [!] 清空数据库失败：%s" % e)
 
@@ -371,7 +380,10 @@ def run(mode, include_cache=False, want_backup=False, assume_yes=False,
         print("\n[预览模式] 未删除任何内容。")
         return 0
 
+    cache_paths = {os.path.join(ROOT, d) for d in EXTRA_DIRS}
     if want_backup:
+        if any(p in cache_paths for _l, paths in plan for p in paths):
+            print("  [提示] 缓存目录为可再生数据，将整体删除、不做文件级备份。")
         files = [p for _l, paths in plan for p in paths if os.path.isfile(p)]
         backups(files, "files", backup_root)
 
@@ -519,7 +531,7 @@ def main():
         mode, days = "all", None
 
     sys.exit(run(mode, args.include_cache, args.backup, True,
-                 False, args.backup_dir, dry_run=args.list,
+                 args.purge_db, args.backup_dir, dry_run=args.list,
                  older_days=days, top=args.top) or 0)
 
 

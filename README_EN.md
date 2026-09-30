@@ -1,6 +1,6 @@
 English | [简体中文](README.md)
 
-# wb-conversation-cleanup
+# wb-conversation-purge
 
 > You clicked "Delete conversation" in WorkBuddy. It didn't actually delete anything.
 > The file sits on your disk until you do something about it.
@@ -84,12 +84,12 @@ Same SKILL.md for both tools — only the install directory differs:
 
 ```bash
 # WorkBuddy
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git \
-    ~/.workbuddy/skills/wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git \
+    ~/.workbuddy/skills/wb-conversation-purge
 
 # Claude Code
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git \
-    ~/.claude/skills/wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git \
+    ~/.claude/skills/wb-conversation-purge
 ```
 
 Then just say, in conversation:
@@ -107,8 +107,8 @@ The agent loads it and follows the workflow.
 ### As a standalone script (no AI tooling needed)
 
 ```bash
-git clone https://github.com/DF-Guan/wb-conversation-cleanup.git
-cd wb-conversation-cleanup
+git clone https://github.com/DF-Guan/wb-conversation-purge.git
+cd wb-conversation-purge
 python scripts/cleanup.py          # launches the menu
 ```
 
@@ -153,6 +153,9 @@ python scripts/cleanup.py --all --backup --yes
 
 # Everything + cache directories
 python scripts/cleanup.py --all --include-cache --backup --yes
+
+# Also wipe the session list in the UI (database backed up first)
+python scripts/cleanup.py --all --purge-db --backup --yes
 
 # Changed your mind — restore from backup
 python scripts/cleanup.py --restore ~/Desktop/WB-Cleanup-Backup/files-0911-092353
@@ -255,7 +258,15 @@ Requires Python 3.9+, **no third-party dependencies**. Three platforms × three 
 python tests/test_cleanup.py
 ```
 
-Eight cases, all running against temp directories and fake data — nothing touches your real files.
+Nine cases, all running against temp directories and fake data — nothing touches your real files.
+
+---
+
+## Changelog
+
+- **2.0.0 (2026-09)** — Renamed to `wb-conversation-purge` (purge is what this actually does); fixed the `--purge-db` flag never reaching the runner function; added UTF-8 output protection for Windows consoles; purge-db and cache cleanup now write to the audit log; SKILL.md updated to the full WorkBuddy marketplace frontmatter spec
+- **1.1.0** — Cache cleanup became its own mode, no longer bundled with deleting conversations; added backup and one-click restore
+- **1.0.0** — Initial release
 
 ---
 
