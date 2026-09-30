@@ -272,6 +272,7 @@ python tests/test_cleanup.py
 
 ## 更新记录
 
+- **2.1.0（2026-09-30）** —— 应用图标随包分发（`assets/icon.png`）；SKILL.md 增加 `examples_zh` / `examples_en` 示例问题，对齐开放平台「试试这样问我」表单
 - **2.0.0（2026-09）** —— 技能更名 `wb-conversation-purge`（purge 才是这件事的本质）；修复 `--purge-db` 参数从未传入执行函数的 bug；Windows 控制台输出加 UTF-8 保护；purge-db 与缓存清理写入审计日志；SKILL.md 按 WorkBuddy 开放平台规范补齐字段，已具备上架技能市场的完整 frontmatter
 - **1.1.0** —— 缓存清理独立成模式，不再捆绑删除对话；新增备份与一键还原
 - **1.0.0** —— 首发
