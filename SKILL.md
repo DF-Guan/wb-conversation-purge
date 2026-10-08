@@ -2,14 +2,14 @@
 name: wb-conversation-purge
 display_name: WorkBuddy 对话记录彻底清理
 display_name_en: WorkBuddy Conversation Purge
-description: "彻底删除 WorkBuddy 本地对话记录与缓存。界面里的「删除」只是软删除（sessions.deleted_at 打标记），对话正文 .jsonl 仍以明文留在硬盘；本技能用于真正从硬盘清除对话、回收磁盘空间、抹去隐私残留。支持只清缓存、按时间清理（30d/6m/1y）、按体积筛选 Top N、清理界面已删除项，删除前自动备份、支持一键还原。当用户说「清理对话」「删除聊天记录」「彻底删除会话」「隐私清理」「清理缓存」「释放磁盘空间」「对话还在硬盘上」「conversation cleanup」「purge chat history」「clear WorkBuddy cache」时使用本技能。"
-description_zh: "一键彻底删除 WorkBuddy 本地对话与缓存：界面删除只是软删除，对话正文仍以明文留在硬盘。先预览清单、经确认后自动备份再删除，支持按时间/体积/软删除筛选，可一键还原，安全回收磁盘空间、抹去隐私残留。"
-description_en: "Truly purge WorkBuddy local chat history and caches from disk. The UI delete is only a soft-delete flag; plaintext .jsonl transcripts remain on disk. This skill previews a plan, backs up, then purges selected conversations or caches, with time/size filters and one-click restore."
+description: "彻底删除 WorkBuddy 本地对话记录与缓存。界面里的「删除」只是软删除（sessions.deleted_at 打标记），对话正文 .jsonl 仍以明文留在硬盘；本技能用于真正从硬盘清除对话、回收磁盘空间、抹去隐私残留——WorkBuddy 运行中也可直接清理，被占用文件自动跳过。支持只清缓存、按时间清理（30d/6m/1y）、按体积筛选 Top N、清理界面已删除项，删除前自动备份、支持一键还原。当用户说「清理对话」「删除聊天记录」「彻底删除会话」「隐私清理」「清理缓存」「释放磁盘空间」「对话还在硬盘上」「conversation cleanup」「purge chat history」「clear WorkBuddy cache」时使用本技能。"
+description_zh: "运行中即可一键彻底删除 WorkBuddy 本地对话与缓存（被占用文件自动跳过）：界面删除只是软删除，对话正文仍以明文留在硬盘。先预览清单、经确认后自动备份再删除，支持按时间/体积/软删除筛选，可一键还原，安全回收磁盘空间、抹去隐私残留。"
+description_en: "Purge WorkBuddy local chat history and caches right from the chat while WorkBuddy is running (locked files are skipped automatically). The UI delete is only a soft-delete flag; plaintext .jsonl transcripts remain on disk. This skill previews a plan, backs up, then purges selected conversations or caches, with time/size filters and one-click restore."
 when_to_use: "清理对话, 删除聊天记录, 彻底删除, 释放空间, 隐私清理, 对话还在硬盘上, 清理缓存, conversation cleanup, purge chat history"
 examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉"]
 examples_en: ["Purge my WorkBuddy chat history from disk", "Free up disk space by clearing WorkBuddy caches", "Delete conversations older than 30 days for real"]
 category: productivity-tools
-version: 2.1.0
+version: 2.2.0
 author: DF
 allowed-tools: Bash(python:*)
 agent_created: true
@@ -41,7 +41,7 @@ agent_created: true
 
 2. **确认范围** —— 与用户敲定用哪一档：只清缓存 / 只清界面已删除项 / 按时间 / 全部 / 是否连界面列表一起清。未经用户明确同意，不得进入下一步。
 
-3. **提醒完全退出 WorkBuddy**（含托盘图标）。脚本检测到进程在跑会自行中止。
+3. **直接执行** —— WorkBuddy 运行中也能清理：被占用的文件（如当前对话）会自动跳过并标注 `[跳过]`，其余照常删除。仅当使用 `--purge-db`、或要求 100% 清理干净时，才需要先完全退出 WorkBuddy（含托盘图标）。
 
 4. **备份后删除** —— 默认带 `--backup`（除非用户明确说不备份），加 `--yes` 跳过脚本内的二次输入：
    ```bash
@@ -100,8 +100,8 @@ python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore "<备份目录>"
 | 相对路径报「找不到脚本」 | 调用技能不切换 cwd，必须用绝对路径，见第零步 |
 | 报删除失败 | 多半实际已删除。删完必须重新 `--list` 复查，别只看报错 |
 | 界面列表还在 | 正常。清文件不同步删列表；想连列表一起清加 `--purge-db` |
-| 「莫名没删掉」 | WorkBuddy 没退干净，文件被占用 |
-| 当前会话的文件删不掉 | 正在使用中，退出后即可删，不必单独处理 |
+| 「清理后有残留」 | 运行中被占用的文件会标 `[跳过] 被占用`；想补清就退出 WorkBuddy 重跑同一命令 |
+| 当前会话的文件删不掉 | 正在使用中，运行中自动跳过；退出后即可删，不必单独处理 |
 | 清单里出现陌生文件夹名 | 该会话在数据库里没有标题，退回显示项目文件夹名 |
 
 ## 顺序铁律

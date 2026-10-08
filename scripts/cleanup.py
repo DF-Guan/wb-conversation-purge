@@ -306,15 +306,21 @@ def do_delete(plan):
     freed = fails = 0
     for _label, paths in plan:
         for p in paths:
-            try:
-                freed += path_size(p)
-                if os.path.isfile(p):
+            before = path_size(p)
+            if os.path.isfile(p):
+                try:
                     os.remove(p)
-                elif os.path.isdir(p):
-                    shutil.rmtree(p)
-            except Exception as e:
-                fails += 1
-                print("  [!] 删除失败 %s -> %s" % (p, e))
+                    freed += before
+                except Exception as e:
+                    fails += 1
+                    print("  [跳过] 被占用 %s -> %s" % (p, e))
+            elif os.path.isdir(p):
+                def onerror(func, path, exc_info):
+                    nonlocal fails
+                    fails += 1
+                    print("  [跳过] 被占用 %s" % path)
+                shutil.rmtree(p, onerror=onerror)
+                freed += before - path_size(p)
     if os.path.isdir(PROJECTS):
         for d in os.listdir(PROJECTS):
             p = os.path.join(PROJECTS, d)
@@ -357,9 +363,8 @@ def run(mode, include_cache=False, want_backup=False, assume_yes=False,
     backup_root = backup_root or default_backup_root()
 
     if not dry_run and app_running():
-        print("[中止] WorkBuddy 仍在运行。请完全退出（含托盘图标）后再执行删除，")
-        print("       否则文件被占用无法删除。")
-        return 2
+        print("[提示] WorkBuddy 正在运行：被占用的文件（如当前对话）会自动跳过，其余照常清理。")
+        print("       如需 100% 清理干净或使用 --purge-db，请完全退出 WorkBuddy 后重跑。\n")
 
     idx = scan_projects()
     print("数据根目录：%s" % ROOT)
@@ -397,7 +402,10 @@ def run(mode, include_cache=False, want_backup=False, assume_yes=False,
     audit("模式=%s 删除 %d 项，释放 %s，失败 %d" % (mode, len(plan), hsize(freed), fails))
     print("审计日志：%s" % AUDIT_LOG)
     if purge:
-        purge_db(backup_root)
+        if app_running():
+            print("\n[跳过] --purge-db 需写入数据库，WorkBuddy 运行中无法执行；请退出后重跑。")
+        else:
+            purge_db(backup_root)
     return 0
 
 
