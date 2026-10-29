@@ -266,6 +266,7 @@ Nine cases, all running against temp directories and fake data — nothing touch
 
 ## Changelog
 
+- **2.3.0 (2026-10)** — Coverage and usability upgrade: new `--auto` one-shot mode (soft-deleted sessions + every regenerable cache); cache scope now includes `cache`, `shell-snapshots` and rotated `logs/*.old.log`; `file-history` / `changes-detail` treated as rollback data and preserved by default; deletion is now **per-file** (one locked file no longer aborts a directory, and bulk-delete guards are no longer tripped); `--list` reports total vs. cleanable bytes; description rewritten trigger-first and tells agents not to hand-roll PowerShell cleanup
 - **2.2.0 (2026-10)** — Clean **while WorkBuddy is running**: no longer forces an app quit; locked files (e.g. the current conversation) are skipped and reported, everything else is deleted; `--purge-db` refuses cleanly while running; freed-space stats now reflect what was actually removed
 - **2.1.0 (2026-09-30)** — App icon now ships with the package (`assets/icon.png`); SKILL.md adds `examples_zh` / `examples_en` sample prompts matching the marketplace "try asking me" form
 - **2.0.0 (2026-09)** — Renamed to `wb-conversation-purge` (purge is what this actually does); fixed the `--purge-db` flag never reaching the runner function; added UTF-8 output protection for Windows consoles; purge-db and cache cleanup now write to the audit log; SKILL.md updated to the full WorkBuddy marketplace frontmatter spec

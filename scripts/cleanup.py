@@ -5,6 +5,7 @@ WorkBuddy 本地数据彻底清理工具
 用法：
   交互菜单     python cleanup.py
   预览         python cleanup.py --list [--cache-only] [--older-than 30d] [--top 10]
+  一键清理     python cleanup.py --auto --backup --yes
   只清缓存     python cleanup.py --cache-only --backup --yes
   软删除项     python cleanup.py --soft-deleted --backup --yes
   按时间       python cleanup.py --older-than 30d --backup --yes
@@ -33,7 +34,8 @@ for _stream in (sys.stdout, sys.stderr):
 ROOT = os.path.join(os.path.expanduser("~"), ".workbuddy")
 PROJECTS = os.path.join(ROOT, "projects")
 DBFILE = os.path.join(ROOT, "workbuddy.db")
-EXTRA_DIRS = ["blobs", "file-history", "traces", "artifact-index"]
+# 可再生的缓存目录（file-history / changes-detail 属于回滚数据，默认不动）
+EXTRA_DIRS = ["blobs", "traces", "artifact-index", "cache", "shell-snapshots"]
 AUDIT_LOG = os.path.join(ROOT, "cleanup-audit.log")
 LINE = "-" * 64
 
@@ -192,7 +194,7 @@ def build_plan(mode, idx, include_cache=False, older_days=None, top=None):
 
     if mode == "cache":
         pass
-    elif mode == "soft":
+    elif mode in ("soft", "auto"):
         for sid in deleted_ids():
             files = idx.get(sid)
             if not files:
@@ -213,11 +215,14 @@ def build_plan(mode, idx, include_cache=False, older_days=None, top=None):
             when = t.strftime("%m-%d") if t else "--"
             plan.append(("[%s] %s" % (when, label[:44]), [fp for fp, _s in files]))
 
-    if include_cache or mode == "cache":
+    if include_cache or mode in ("cache", "auto"):
         for name in EXTRA_DIRS:
             d = os.path.join(ROOT, name)
             if os.path.isdir(d):
                 plan.append(("[缓存目录] %s" % name, [d]))
+        logs = rotated_logs()
+        if logs:
+            plan.append(("[轮转日志] logs/*.old.log", logs))
 
     if top:
         plan.sort(key=lambda it: sum(path_size(p) for p in it[1]), reverse=True)
@@ -304,23 +309,37 @@ def audit(text):
 
 def do_delete(plan):
     freed = fails = 0
+
+    def delete_tree(p):
+        """逐文件删除目录树：单文件锁不影响其余文件，也不触发批量删除保护"""
+        nonlocal fails
+        before = path_size(p)
+        for root_dir, _dirs, files in os.walk(p, topdown=False):
+            for f in files:
+                fp = os.path.join(root_dir, f)
+                try:
+                    os.remove(fp)
+                except OSError:
+                    fails += 1
+                    print("  [跳过] 被占用 %s" % fp)
+            try:
+                os.rmdir(root_dir)
+            except OSError:
+                pass
+        return before - path_size(p)
+
     for _label, paths in plan:
         for p in paths:
-            before = path_size(p)
             if os.path.isfile(p):
+                sz = path_size(p)
                 try:
                     os.remove(p)
-                    freed += before
+                    freed += sz
                 except Exception as e:
                     fails += 1
                     print("  [跳过] 被占用 %s -> %s" % (p, e))
             elif os.path.isdir(p):
-                def onerror(func, path, exc_info):
-                    nonlocal fails
-                    fails += 1
-                    print("  [跳过] 被占用 %s" % path)
-                shutil.rmtree(p, onerror=onerror)
-                freed += before - path_size(p)
+                freed += delete_tree(p)
     if os.path.isdir(PROJECTS):
         for d in os.listdir(PROJECTS):
             p = os.path.join(PROJECTS, d)
@@ -350,8 +369,28 @@ def purge_db(backup_root):
         print("  [!] 清空数据库失败：%s" % e)
 
 
+def rotated_logs():
+    """logs 目录里已轮转的旧日志（活跃日志被占用，不纳入）"""
+    d = os.path.join(ROOT, "logs")
+    out = []
+    if os.path.isdir(d):
+        for f in os.listdir(d):
+            fp = os.path.join(d, f)
+            if os.path.isfile(fp) and (f.endswith(".old.log") or ".log." in f):
+                out.append(fp)
+    return out
+
+
 def cache_total():
-    return sum(path_size(os.path.join(ROOT, d)) for d in EXTRA_DIRS)
+    return (sum(path_size(os.path.join(ROOT, d)) for d in EXTRA_DIRS)
+            + sum(path_size(p) for p in rotated_logs()))
+
+
+def root_usage():
+    """返回 (根目录总占用, 其中可清理量)"""
+    cleanable = cache_total()
+    total = path_size(ROOT)
+    return total, cleanable
 
 
 def conv_summary(idx):
@@ -368,6 +407,9 @@ def run(mode, include_cache=False, want_backup=False, assume_yes=False,
 
     idx = scan_projects()
     print("数据根目录：%s" % ROOT)
+    total_all, cleanable = root_usage()
+    print("根目录总占用：%s（其中可清理约 %s；其余为程序本体、对话数据与配置，不动）"
+          % (hsize(total_all), hsize(cleanable)))
     print("对话占用：%s" % conv_summary(idx))
     print("缓存占用：%s\n" % hsize(cache_total()))
 
@@ -510,6 +552,7 @@ def main():
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--cache-only", action="store_true", help="只清缓存，保留所有对话")
     g.add_argument("--soft-deleted", action="store_true", help="只清界面里已删除的对话")
+    g.add_argument("--auto", action="store_true", help="一键：界面已删对话 + 全部可再生缓存（含轮转日志）")
     g.add_argument("--older-than", metavar="AGE", help="只清早于该时间的对话，如 30d / 6m / 1y")
     g.add_argument("--all", action="store_true", help="清理全部对话记录")
     g.add_argument("--restore", metavar="DIR", help="从备份目录还原")
@@ -526,7 +569,7 @@ def main():
         sys.exit(restore(os.path.expanduser(args.restore)))
 
     if not any([args.list, args.cache_only, args.soft_deleted,
-                args.all, args.older_than is not None]):
+                args.all, args.auto, args.older_than is not None]):
         interactive()
         return
     if args.older_than is not None:
@@ -535,6 +578,8 @@ def main():
         mode, days = "cache", None
     elif args.soft_deleted:
         mode, days = "soft", None
+    elif args.auto:
+        mode, days = "auto", None
     else:
         mode, days = "all", None
 

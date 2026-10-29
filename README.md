@@ -272,6 +272,7 @@ python tests/test_cleanup.py
 
 ## 更新记录
 
+- **2.3.0（2026-10）** —— 覆盖面与易用性升级：新增 `--auto` 一键模式（软删除残留 + 全部可再生缓存）；缓存范围补充 `cache` / `shell-snapshots` / `logs/*.old.log`；`file-history`、`changes-detail` 归为回滚数据默认保留；删除改为**逐文件执行**（单个占用文件不再中断整目录，也不触发环境批量删除保护）；`--list` 增加根目录总占用与可清理量总览；描述改为触发优先，并明确提示 agent 不要手工用 PowerShell 清理
 - **2.2.0（2026-10）** —— 支持 WorkBuddy **运行中直接清理**：不再强制退出应用，被占用文件（如当前对话）自动跳过并标注，其余照常删除；`--purge-db` 运行中会明确拒绝并提示；释放空间统计改为按实际删除量计算
 - **2.1.0（2026-09-30）** —— 应用图标随包分发（`assets/icon.png`）；SKILL.md 增加 `examples_zh` / `examples_en` 示例问题，对齐开放平台「试试这样问我」表单
 - **2.0.0（2026-09）** —— 技能更名 `wb-conversation-purge`（purge 才是这件事的本质）；修复 `--purge-db` 参数从未传入执行函数的 bug；Windows 控制台输出加 UTF-8 保护；purge-db 与缓存清理写入审计日志；SKILL.md 按 WorkBuddy 开放平台规范补齐字段，已具备上架技能市场的完整 frontmatter

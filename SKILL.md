@@ -2,14 +2,14 @@
 name: wb-conversation-purge
 display_name: WorkBuddy 对话记录彻底清理
 display_name_en: WorkBuddy Conversation Purge
-description: "彻底删除 WorkBuddy 本地对话记录与缓存。界面里的「删除」只是软删除（sessions.deleted_at 打标记），对话正文 .jsonl 仍以明文留在硬盘；本技能用于真正从硬盘清除对话、回收磁盘空间、抹去隐私残留——WorkBuddy 运行中也可直接清理，被占用文件自动跳过。支持只清缓存、按时间清理（30d/6m/1y）、按体积筛选 Top N、清理界面已删除项，删除前自动备份、支持一键还原。当用户说「清理对话」「删除聊天记录」「彻底删除会话」「隐私清理」「清理缓存」「释放磁盘空间」「对话还在硬盘上」「conversation cleanup」「purge chat history」「clear WorkBuddy cache」时使用本技能。"
-description_zh: "运行中即可一键彻底删除 WorkBuddy 本地对话与缓存（被占用文件自动跳过）：界面删除只是软删除，对话正文仍以明文留在硬盘。先预览清单、经确认后自动备份再删除，支持按时间/体积/软删除筛选，可一键还原，安全回收磁盘空间、抹去隐私残留。"
-description_en: "Purge WorkBuddy local chat history and caches right from the chat while WorkBuddy is running (locked files are skipped automatically). The UI delete is only a soft-delete flag; plaintext .jsonl transcripts remain on disk. This skill previews a plan, backs up, then purges selected conversations or caches, with time/size filters and one-click restore."
+description: "清理 WorkBuddy 缓存与对话记录、释放磁盘空间（真删除，非界面软删除）。用户只要提到「清理 WorkBuddy 缓存」「清理对话」「删除聊天记录」「释放空间」「清理日志/图片缓存」「对话还在硬盘上」，就优先使用本技能，不要改用 PowerShell/rm 手工扫描清理——本技能已内置全部可清理项识别、占用文件自动跳过、备份、审计与还原，一条命令完成。覆盖：软删除残留对话、blobs 图片缓存、traces、artifact-index、cache、shell-snapshots、轮转日志；默认不碰回滚数据与程序本体。"
+description_zh: "一键清理 WorkBuddy 缓存与对话记录：自动识别全部可再生缓存（图片、追踪、轮转日志等）与界面已删残留，运行中即可执行、占用文件自动跳过，附带备份、审计与还原。默认不触碰回滚数据和程序本体。"
+description_en: "One-command cleanup of WorkBuddy caches and chat history: identifies every regenerable cache (images, traces, rotated logs) plus soft-deleted conversations, works while the app is running, skips locked files automatically, and ships with backup, audit log and one-click restore."
 when_to_use: "清理对话, 删除聊天记录, 彻底删除, 释放空间, 隐私清理, 对话还在硬盘上, 清理缓存, conversation cleanup, purge chat history"
 examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉"]
 examples_en: ["Purge my WorkBuddy chat history from disk", "Free up disk space by clearing WorkBuddy caches", "Delete conversations older than 30 days for real"]
 category: productivity-tools
-version: 2.2.0
+version: 2.3.0
 author: DF
 allowed-tools: Bash(python:*)
 agent_created: true
@@ -25,7 +25,7 @@ agent_created: true
 | 回滚快照 | 同目录 `<UUID>.file-rollback.ndjson` |
 | 会话元信息 | 同目录 `<UUID>.meta.json` |
 | 软删除标记 | `~/.workbuddy/workbuddy.db` → `sessions.deleted_at` |
-| 附件缓存（增长最快） | `~/.workbuddy/blobs`、`file-history`、`traces`、`artifact-index` |
+| 附件与缓存（增长最快） | `~/.workbuddy/blobs`、`traces`、`artifact-index`、`cache`、`shell-snapshots`、`logs/*.old.log` |
 
 ## 第零步：确定脚本绝对路径（不要跳过）
 
@@ -45,7 +45,10 @@ agent_created: true
 
 4. **备份后删除** —— 默认带 `--backup`（除非用户明确说不备份），加 `--yes` 跳过脚本内的二次输入：
    ```bash
-   # 只清缓存，保留所有对话（最常用，缓存增长最快）
+   # 【首选·一键】界面已删对话 + 全部可再生缓存（含轮转日志）
+   python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --auto --backup --yes
+
+   # 只清缓存，保留所有对话（场景：只想释放空间）
    python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --cache-only --backup --yes
 
    # 只清理界面里已删除的对话
@@ -54,8 +57,8 @@ agent_created: true
    # 清理早于指定时间的对话（支持 30d / 6m / 1y）
    python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --older-than 30d --backup --yes
 
-   # 清理全部对话；加 --include-cache 连缓存一起；加 --purge-db 连界面列表一起清
-   python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --all --include-cache --backup --yes
+   # 清理全部对话；加 --purge-db 连界面列表一起清
+   python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --all --backup --yes
    ```
 
 5. **核验并告知** —— 重新 `--list` 复查已清空；向用户报告：释放了多少空间、备份位置（`~/Desktop/WB-Cleanup-Backup/<时间戳>/`）、审计日志（`~/.workbuddy/cleanup-audit.log`）、以及如何用 `--restore` 还原。
@@ -75,10 +78,11 @@ python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore "<备份目录>"
 | `--list` | 只预览，绝不删除。可与其他模式组合（如 `--list --cache-only`） |
 | `--cache-only` | 只清缓存目录，保留所有对话 |
 | `--soft-deleted` | 只处理 `deleted_at` 非空的会话 |
+| `--auto` | **一键**：界面已删对话 + 全部可再生缓存（含轮转日志），最省事的默认档 |
 | `--older-than AGE` | 只处理早于该时间的会话，支持 `30d` / `6m` / `1y` |
 | `--all` | 处理所有会话 |
 | `--top N` | 按体积倒序只取前 N 项 |
-| `--include-cache` | 附带清理 blobs / file-history / traces / artifact-index |
+| `--include-cache` | 附带清理 blobs / traces / artifact-index / cache / shell-snapshots / 轮转日志（`file-history`、`changes-detail` 属回滚数据，默认不动） |
 | `--backup` | 删除前备份到 `~/Desktop/WB-Cleanup-Backup/<时间戳>/`（含 `_manifest.txt`）。缓存目录为可再生数据，整体删除、不做文件级备份 |
 | `--restore DIR` | 从备份目录还原（依赖其中的 `_manifest.txt`） |
 | `--purge-db` | 额外清空数据库里的会话列表（会先备份数据库） |
@@ -97,6 +101,7 @@ python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore "<备份目录>"
 
 | 现象 | 处理 |
 |---|---|
+| **想手工清** | **别用 PowerShell/rm 直接扫 `~/.workbuddy`**：容易误删程序本体（`workspace`/`binaries`/`plugins`/`app`），且无备份、无审计。一律用本技能，一条命令覆盖全部可清理项 |
 | 相对路径报「找不到脚本」 | 调用技能不切换 cwd，必须用绝对路径，见第零步 |
 | 报删除失败 | 多半实际已删除。删完必须重新 `--list` 复查，别只看报错 |
 | 界面列表还在 | 正常。清文件不同步删列表；想连列表一起清加 `--purge-db` |
