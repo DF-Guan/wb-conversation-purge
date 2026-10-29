@@ -309,6 +309,10 @@ def audit(text):
 
 def do_delete(plan):
     freed = fails = 0
+    by_cat = {"对话": 0, "缓存": 0}
+
+    def bucket(p):
+        return "对话" if os.path.abspath(p).startswith(os.path.abspath(PROJECTS)) else "缓存"
 
     def delete_tree(p):
         """逐文件删除目录树：单文件锁不影响其余文件，也不触发批量删除保护"""
@@ -335,11 +339,14 @@ def do_delete(plan):
                 try:
                     os.remove(p)
                     freed += sz
+                    by_cat[bucket(p)] += sz
                 except Exception as e:
                     fails += 1
                     print("  [跳过] 被占用 %s -> %s" % (p, e))
             elif os.path.isdir(p):
-                freed += delete_tree(p)
+                got = delete_tree(p)
+                freed += got
+                by_cat[bucket(p)] += got
     if os.path.isdir(PROJECTS):
         for d in os.listdir(PROJECTS):
             p = os.path.join(PROJECTS, d)
@@ -348,7 +355,7 @@ def do_delete(plan):
                     os.rmdir(p)
                 except OSError:
                     pass
-    return freed, fails
+    return freed, fails, by_cat
 
 
 def purge_db(backup_root):
@@ -439,8 +446,14 @@ def run(mode, include_cache=False, want_backup=False, assume_yes=False,
             print("输入不匹配，已取消。")
             return 0
 
-    freed, fails = do_delete(plan)
-    print("\n完成：释放 %s，失败 %d 项。" % (hsize(freed), fails))
+    freed, fails, by_cat = do_delete(plan)
+    total_after = path_size(ROOT)
+    print("\n完成：释放 %s（对话 %s / 缓存 %s），跳过 %d 项。"
+          % (hsize(freed), hsize(by_cat["对话"]), hsize(by_cat["缓存"]), fails))
+    print("根目录：%s -> %s（净减 %s）"
+          % (hsize(total_all), hsize(total_after), hsize(max(total_all - total_after, 0))))
+    if fails:
+        print("被占用项已跳过；完全退出 WorkBuddy 后重跑同一命令即可补清。")
     audit("模式=%s 删除 %d 项，释放 %s，失败 %d" % (mode, len(plan), hsize(freed), fails))
     print("审计日志：%s" % AUDIT_LOG)
     if purge:
@@ -455,36 +468,46 @@ def list_backups(root):
     if not os.path.isdir(root):
         return []
     return sorted([os.path.join(root, d) for d in os.listdir(root)
-                   if os.path.isdir(os.path.join(root, d))], key=os.path.getmtime)
+                   if os.path.isdir(os.path.join(root, d))], key=os.path.getmtime, reverse=True)
+
+
+def pick_latest_backup(root):
+    """最新一个带 _manifest.txt 的备份目录（可直接还原）"""
+    for d in list_backups(root):
+        if os.path.isfile(os.path.join(d, "_manifest.txt")):
+            return d
+    return None
 
 
 def interactive():
-    if app_running():
-        print("\n  [!] WorkBuddy 正在运行，请先完全退出再运行本工具。")
-        input("\n按回车键退出...")
-        return
     idx = scan_projects()
+    total_all, cleanable = root_usage()
     print(LINE)
-    print(" WorkBuddy 对话清理工具")
+    print(" WorkBuddy 清理工具")
     print(" " + ROOT)
     print(LINE)
-    print("\n对话占用：%s" % conv_summary(idx))
+    print("\n根目录总占用：%s（其中可清理约 %s）" % (hsize(total_all), hsize(cleanable)))
+    print("对话占用：%s" % conv_summary(idx))
     print("缓存占用：%s\n" % hsize(cache_total()))
+    if app_running():
+        print("  [!] WorkBuddy 正在运行：占用文件会自动跳过（--purge-db 需退出后执行）\n")
     print("  1) 只看预览，不删除")
-    print("  2) 只清理【界面里已删除】的对话")
-    print("  3) 只清理【缓存】，保留所有对话")
-    print("  4) 清理【全部】对话记录")
-    print("  5) 清理【全部】对话 + 缓存")
-    print("  6) 还原（restore）")
+    print("  2) 【推荐】一键清理：界面已删对话 + 缓存")
+    print("  3) 只清理【界面里已删除】的对话")
+    print("  4) 只清理【缓存】，保留所有对话")
+    print("  5) 清理【全部】对话记录")
+    print("  6) 清理【全部】对话 + 缓存")
+    print("  7) 还原（restore）")
     print("  0) 退出")
     c = input("\n输入序号后回车：").strip()
 
-    if c == "6":
-        bks = list_backups(default_backup_root())
+    if c == "7":
+        root = default_backup_root()
+        bks = list_backups(root)
         if not bks:
-            print("没有找到备份：%s" % default_backup_root())
+            print("没有找到备份：%s" % root)
         else:
-            print("\n可用备份：")
+            print("\n可用备份（由新到旧）：")
             for i, b in enumerate(bks, 1):
                 print("  %d) %s" % (i, os.path.basename(b)))
             try:
@@ -497,15 +520,15 @@ def interactive():
     if c == "0":
         print("已取消。")
         return
-    if c not in ("1", "2", "3", "4", "5"):
+    if c not in ("1", "2", "3", "4", "5", "6"):
         print("无效选项。")
         return
 
     if c == "1":
         plan = build_plan("all", idx, True)
     else:
-        mode, inc = {"2": ("soft", False), "3": ("cache", False),
-                     "4": ("all", False), "5": ("all", True)}[c]
+        mode, inc = {"2": ("auto", False), "3": ("soft", False), "4": ("cache", False),
+                     "5": ("all", False), "6": ("all", True)}[c]
         plan = build_plan(mode, idx, inc)
 
     if not plan:
@@ -527,14 +550,17 @@ def interactive():
         print("输入不匹配，已取消。")
         return
 
-    freed, fails = do_delete(plan)
-    print("\n完成：释放 %s，失败 %d 项。" % (hsize(freed), fails))
+    freed, fails, by_cat = do_delete(plan)
+    print("\n完成：释放 %s（对话 %s / 缓存 %s），跳过 %d 项。"
+          % (hsize(freed), hsize(by_cat["对话"]), hsize(by_cat["缓存"]), fails))
     audit("模式=%s 删除 %d 项，释放 %s，失败 %d" % (c, len(plan), hsize(freed), fails))
-    if c in ("4", "5"):
+    if c in ("5", "6"):
         if input("\n是否同时清空界面会话列表（数据库记录）？(y/N)：").strip().lower() == "y":
-            purge_db(default_backup_root())
-    print("\n可以重新启动 WorkBuddy 了。")
-    input("\n按回车键退出...")
+            if app_running():
+                print("  [跳过] --purge-db 需要退出 WorkBuddy 后执行。")
+            else:
+                purge_db(default_backup_root())
+    input("\n完成，按回车键退出...")
 
 
 def main():
@@ -542,10 +568,12 @@ def main():
         description="彻底清理 WorkBuddy 本地对话与缓存",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="示例：\n"
-               "  cleanup.py --list --top 10\n"
+               "  cleanup.py --list --auto            # 预览一键清理会删什么\n"
+               "  cleanup.py --auto --backup --yes    # 一键清理（推荐）\n"
                "  cleanup.py --cache-only --backup --yes\n"
                "  cleanup.py --older-than 30d --backup --yes\n"
-               "  cleanup.py --restore ~/Desktop/WB-Cleanup-Backup/files-0911-092353\n")
+               "  cleanup.py --list-backups           # 查看所有备份\n"
+               "  cleanup.py --restore-latest         # 还原最近一次备份\n")
     # 注意：--list 是"预览"修饰符而非模式，不能放进互斥组，
     # 否则 "--list --cache-only" 这类组合会被 argparse 拒绝。
     ap.add_argument("--list", action="store_true", help="只预览，不删除")
@@ -555,15 +583,38 @@ def main():
     g.add_argument("--auto", action="store_true", help="一键：界面已删对话 + 全部可再生缓存（含轮转日志）")
     g.add_argument("--older-than", metavar="AGE", help="只清早于该时间的对话，如 30d / 6m / 1y")
     g.add_argument("--all", action="store_true", help="清理全部对话记录")
-    g.add_argument("--restore", metavar="DIR", help="从备份目录还原")
+    g.add_argument("--restore", metavar="DIR", help="从指定备份目录还原")
+    g.add_argument("--restore-latest", action="store_true", help="还原最近一次备份（不用记目录名）")
+    ap.add_argument("--list-backups", action="store_true", help="列出所有备份目录")
     ap.add_argument("--include-cache", action="store_true",
-                    help="连同 blobs/file-history/traces/artifact-index 一起清理")
+                    help="附带清理 blobs/traces/artifact-index/cache/shell-snapshots/轮转日志")
     ap.add_argument("--top", type=int, metavar="N", help="只处理体积最大的 N 项")
     ap.add_argument("--backup", action="store_true", help="删除前先备份")
     ap.add_argument("--purge-db", action="store_true", help="同时清空数据库中的会话列表")
     ap.add_argument("--yes", action="store_true", help="跳过 DELETE 确认（仅限已确认过）")
     ap.add_argument("--backup-dir", default=None, help="备份存放根目录")
     args = ap.parse_args()
+
+    if args.list_backups:
+        root = args.backup_dir or default_backup_root()
+        bks = list_backups(root)
+        if not bks:
+            print("没有找到备份：%s" % root)
+        else:
+            print("可用备份（由新到旧）：%s" % root)
+            for i, b in enumerate(bks, 1):
+                mark = "  ← 可还原" if os.path.isfile(os.path.join(b, "_manifest.txt")) else ""
+                print("  %d) %s%s" % (i, os.path.basename(b), mark))
+        sys.exit(0)
+
+    if args.restore_latest:
+        root = args.backup_dir or default_backup_root()
+        latest = pick_latest_backup(root)
+        if not latest:
+            print("[失败] 没有可还原的备份（缺少 _manifest.txt）：%s" % root)
+            sys.exit(1)
+        print("还原最近备份：%s" % latest)
+        sys.exit(restore(latest))
 
     if args.restore:
         sys.exit(restore(os.path.expanduser(args.restore)))

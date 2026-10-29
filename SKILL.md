@@ -9,7 +9,7 @@ when_to_use: "清理对话, 删除聊天记录, 彻底删除, 释放空间, 隐�
 examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉"]
 examples_en: ["Purge my WorkBuddy chat history from disk", "Free up disk space by clearing WorkBuddy caches", "Delete conversations older than 30 days for real"]
 category: productivity-tools
-version: 2.3.0
+version: 2.4.0
 author: DF
 allowed-tools: Bash(python:*)
 agent_created: true
@@ -61,11 +61,16 @@ agent_created: true
    python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --all --backup --yes
    ```
 
-5. **核验并告知** —— 重新 `--list` 复查已清空；向用户报告：释放了多少空间、备份位置（`~/Desktop/WB-Cleanup-Backup/<时间戳>/`）、审计日志（`~/.workbuddy/cleanup-audit.log`）、以及如何用 `--restore` 还原。
+5. **核验并告知** —— 重新 `--list` 复查；向用户报告脚本给出的结果：**释放量（对话/缓存分账）、根目录清理前后对比**、备份位置（`~/Desktop/WB-Cleanup-Backup/<时间戳>/`）、审计日志（`~/.workbuddy/cleanup-audit.log`）、以及如何用 `--restore` / `--restore-latest` 还原。
 
 ## 还原
 
 ```bash
+# 不知道备份时间戳？先列出所有备份，再还原最近一次
+python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --list-backups
+python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore-latest
+
+# 或用指定目录还原
 python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore "<备份目录>"
 ```
 
@@ -85,6 +90,8 @@ python "${CLAUDE_SKILL_DIR}/scripts/cleanup.py" --restore "<备份目录>"
 | `--include-cache` | 附带清理 blobs / traces / artifact-index / cache / shell-snapshots / 轮转日志（`file-history`、`changes-detail` 属回滚数据，默认不动） |
 | `--backup` | 删除前备份到 `~/Desktop/WB-Cleanup-Backup/<时间戳>/`（含 `_manifest.txt`）。缓存目录为可再生数据，整体删除、不做文件级备份 |
 | `--restore DIR` | 从备份目录还原（依赖其中的 `_manifest.txt`） |
+| `--restore-latest` | **还原最近一次备份**（不用记时间戳目录） |
+| `--list-backups` | 列出所有备份目录，标注哪些可还原 |
 | `--purge-db` | 额外清空数据库里的会话列表（会先备份数据库） |
 | `--yes` | 跳过 DELETE 确认。仅当用户已在对话中确认后使用 |
 | `--backup-dir PATH` | 自定义备份根目录 |

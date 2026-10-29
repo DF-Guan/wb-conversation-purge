@@ -159,10 +159,32 @@ def test_delete_removes_files_and_empty_dirs():
     try:
         idx = cleanup.scan_projects()
         plan = cleanup.build_plan("all", idx)
-        freed, fails = cleanup.do_delete(plan)
+        freed, fails, cats = cleanup.do_delete(plan)
         assert fails == 0
         assert freed == 160, freed
+        assert cats["对话"] == 160, cats
         assert not os.path.exists(os.path.join(proj, "p1")), "空目录应被回收"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_pick_latest_backup_skips_dirs_without_manifest():
+    """还原最近备份：只认带 _manifest.txt 的目录，且取最新"""
+    tmp, _root, _proj, _c = make_fake_env({})
+    try:
+        root = os.path.join(tmp, "bk")
+        older = os.path.join(root, "files-0101-000000")
+        newer = os.path.join(root, "files-0202-000000")
+        os.makedirs(older)
+        os.makedirs(newer)
+        for d in (older, newer):
+            with open(os.path.join(d, "_manifest.txt"), "w", encoding="utf-8") as fh:
+                fh.write("# 原始路径\t字节\n")
+        os.utime(older, (1000, 1000))
+        os.utime(newer, (2000, 2000))
+        assert cleanup.pick_latest_backup(root) == newer
+        os.remove(os.path.join(newer, "_manifest.txt"))
+        assert cleanup.pick_latest_backup(root) == older
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
