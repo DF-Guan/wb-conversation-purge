@@ -9,7 +9,7 @@ when_to_use: "清理对话, 删除聊天记录, 彻底删除, 释放空间, 隐�
 examples_zh: ["帮我彻底清理 WorkBuddy 的对话记录", "清理一下 WorkBuddy 缓存，磁盘快满了", "把 30 天前的对话从硬盘上删掉"]
 examples_en: ["Purge my WorkBuddy chat history from disk", "Free up disk space by clearing WorkBuddy caches", "Delete conversations older than 30 days for real"]
 category: productivity-tools
-version: 2.4.0
+version: 2.4.1
 author: DF
 allowed-tools: Bash(python:*)
 agent_created: true

@@ -266,6 +266,7 @@ Nine cases, all running against temp directories and fake data — nothing touch
 
 ## Changelog
 
+- **2.4.1 (2026-10)** — New app icon (sweeping robot), synced to the repo and the skill package
 - **2.4.0 (2026-10)** — UX upgrade: cleanup now reports **before/after totals plus a conversations-vs-caches breakdown**; new `--restore-latest` (restore the newest backup in one flag) and `--list-backups`; interactive menu gains a "one-click" entry and works while the app is running
 - **2.3.0 (2026-10)** — Coverage and usability upgrade: new `--auto` one-shot mode (soft-deleted sessions + every regenerable cache); cache scope now includes `cache`, `shell-snapshots` and rotated `logs/*.old.log`; `file-history` / `changes-detail` treated as rollback data and preserved by default; deletion is now **per-file** (one locked file no longer aborts a directory, and bulk-delete guards are no longer tripped); `--list` reports total vs. cleanable bytes; description rewritten trigger-first and tells agents not to hand-roll PowerShell cleanup
 - **2.2.0 (2026-10)** — Clean **while WorkBuddy is running**: no longer forces an app quit; locked files (e.g. the current conversation) are skipped and reported, everything else is deleted; `--purge-db` refuses cleanly while running; freed-space stats now reflect what was actually removed
